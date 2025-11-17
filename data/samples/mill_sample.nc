@@ -1,0 +1,13 @@
+(Mill outline sample)
+G21
+G90
+G0 Z5
+G0 X0 Y0
+G1 Z-0.5 F150
+G1 X20 Y0
+G1 X20 Y10
+G1 X0 Y10
+G1 X0 Y0
+G0 Z5
+M5
+M2
