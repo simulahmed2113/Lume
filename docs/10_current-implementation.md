@@ -10,7 +10,7 @@
 
 ## Overview
 
-This project is a **Python desktop application** for viewing and simulating
+This project is a **Python desktop application** for viewing
 CNC / PCB G-code.
 
 The goals of the current implementation are:
@@ -18,15 +18,13 @@ The goals of the current implementation are:
 - Import one or more `.nc` G-code files into a simple **Project**.
 - Visualise the toolpaths in a 3D/2D **OpenGL viewer** with an XY grid and
   coloured axes (X = red, Y = green, Z = blue).
-- Show and edit the raw G-code in a **text editor** panel.
-- Maintain two-way sync between **viewer selection** and **editor
-  line selection**.
-- Run a basic **offline simulation** (no actual machine connection) that
-  walks through the program line-by-line, shows a "tool head" marker,
-  and colours already-visited paths.
+- Show and edit the G-code in a **text editor** panel.
+- Maintain one-way sync from **editor selection** to **viewer
+  segment highlight**.
 
-Advanced CNC features (auto-leveling, Z offset, resume from any line,
-probing, etc.) are planned but **not part of this snapshot**.
+Offline simulation, vertex picking, and other NC-Viewer-style features are
+intentionally **not implemented** in this snapshot; the focus is a small,
+robust foundation.
 
 ---
 
@@ -73,17 +71,20 @@ Key concepts:
 
     * `name` - filename as shown in the UI.
     * `path` - optional filesystem path.
-    * `source` - full raw G-code text.
+    * `original_source` - full G-code text as last parsed / imported.
     * `program` - parsed representation of the G-code (`GCodeProgram`).
     * `geometry` - `ToolpathGeometry`, a list of line segments for drawing.
     * `program_index` - `ProgramIndex`, mapping between statements and
-      segments (used for selection and simulation).
+      segments (used for editor↔viewer selection).
+    * `offset_x`, `offset_y`, `offset_z` - per-job workpiece offsets used
+      when generating the final Lume header (`G92` line).
     * `id` - unique identifier.
     * `visible` - checkbox state in Project tree.
     * `color` - base RGBA colour for this job in the viewer.
 
 The data model is intentionally simple; advanced NC-Viewer-style
-"movements list" is **not yet implemented** in this snapshot.
+"movements list" and transform pipelines are **not implemented** in this
+snapshot.
 
 ---
 
@@ -166,8 +167,7 @@ Responsibilities:
   * Connects menu actions to:
 
     * Import G-code,
-    * Top view / isometric view,
-    * Simulation controls (start, stop, step),
+    * Top view camera preset,
     * Apply G-code edits.
 
 * **`app/project_tree.py`**
@@ -181,15 +181,21 @@ Responsibilities:
 * **`app/gcode_editor.py`**
 
   * Text editor for the G-code.
-  * Shows `job.source`.
+  * Shows the **final Lume G-code** for the job: header + body + footer
+    generated via `core.lume_runtime.build_final_gcode(job)` using the
+    current XYZ offsets.
   * "Apply G-code edits" button triggers `reparse_job(job, text)` in
     `import_pipeline.py` and refreshes viewer.
 
 * **`app/viewer.py`**
 
-  * Wraps a `pyqtgraph.opengl.GLViewWidget` as `GCodeViewer`.
-  * Renders toolpaths as GL line strips for each job.
-  * Handles camera control, hover highlight, picking, and simulation display.
+  * Wraps a `pyqtgraph.opengl.GLViewWidget` inside `GCodeViewer`.
+  * Renders toolpaths as GL line strips for each job using
+    `job.geometry.segments` only.
+  * Handles camera control (distance/orbit, top view) and approximate
+    XY(Z) cursor readout via unprojection.
+  * Exposes `highlight_segments(job, segment_indices)` for editor-driven
+    selection highlighting.
 
 ---
 
@@ -223,15 +229,13 @@ Responsibilities:
      * GL line plot is built from `job.geometry.segments`.
    * When a job is selected in the tree:
 
-     * `GCodeEditor.set_job(job)` shows `job.source`.
+     * `GCodeEditor.set_job(job)` shows the final Lume G-code for that job
+       (header/body/footer with current offsets).
 
-5. **Selection & Simulation**
+5. **Selection**
 
-   * Editor line selection -> ProgramIndex -> segments -> viewer highlight.
-   * Viewer pick -> segment index -> ProgramIndex -> statement index ->
-     editor line selection.
-   * Simulation uses the same `ProgramIndex` to step through statements and
-     compute which segments belong to the current line.
+   * Editor line selection -> `ProgramIndex` -> segment indices ->
+     viewer highlight via `GCodeViewer.highlight_segments(...)`.
 
 ---
 
@@ -512,18 +516,11 @@ treat them as bugs they "discovered".
 4. **Select and inspect lines**
 
    * Click in the editor -> highlight corresponding path segment(s).
-   * Right-click near a segment in 2D view -> editor jumps to that line.
 
 5. **Edit G-code**
 
    * Modify coordinates or feed rates.
    * Click "Apply G-code edits" -> geometry recalculated -> inspect change.
-
-6. **Run simulation**
-
-   * Start simulation; watch tool head and visited path colours.
-   * Hover/selection disabled during playback to keep behaviour clean.
-   * Stop/reset when done.
 
 ---
 
@@ -535,7 +532,7 @@ Quick reference for next developers:
 main.py                 - Qt app bootstrap; creates MainWindow.
 
 app/
-  main_window.py        - Main window, menus, docks, simulation control.
+  main_window.py        - Main window, menus, docks.
   project_tree.py       - Project tree widget with job list & visibility.
   viewer.py             - GCodeViewer: OpenGL viewer, camera, selection.
   gcode_editor.py       - Plain text editor for job.source.

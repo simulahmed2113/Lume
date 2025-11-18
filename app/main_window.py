@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
@@ -13,13 +13,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStatusBar,
-    QToolBar,
     QVBoxLayout,
     QWidget,
     QToolButton,
     QDialog,
 )
-from PySide6.QtGui import QTextCursor, QAction
+from PySide6.QtGui import QTextCursor
 
 from app.gcode_editor import GCodeEditor
 from app.project_tree import ProjectTreeWidget
@@ -35,9 +34,8 @@ class MainWindow(QMainWindow):
     - 3D viewer in the central area.
     - Editable G-code editor with Apply button.
     - Project tree with per-job visibility checkboxes.
-    - Live XY cursor readout and plot→editor selection.
+    - Live XY cursor readout and plot�+'editor selection.
     - Simple "Top view" camera option.
-    - Offline G-code simulation controls (Run / Pause / Stop).
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -47,24 +45,11 @@ class MainWindow(QMainWindow):
         self.project = Project(name="Untitled Project")
         self.current_job: Optional[GCodeJob] = None
 
-        # Simulation state
-        self._sim_state: str = "idle"  # idle | running | paused
-        self._sim_job: Optional[GCodeJob] = None
-        self._sim_current_stmt_index: int = -1
-        self._sim_interval_ms: int = 30
-        self._sim_lines_per_second: float = 400.0
-
         self._create_viewer()
         self._create_project_tree_dock()
         self._create_gcode_editor_dock()
         self._create_status_bar()
         self._create_menu_bar()
-        self._create_sim_toolbar()
-
-        # QTimer for offline simulation
-        self.sim_timer = QTimer(self)
-        self.sim_timer.setInterval(self._sim_interval_ms)
-        self.sim_timer.timeout.connect(self._on_sim_tick)
 
     # ----------------------------------------------------------------- UI setup
 
@@ -79,7 +64,6 @@ class MainWindow(QMainWindow):
 
         # Hooks from viewer
         self.viewer.cursor_moved_callback = self._on_view_cursor_moved
-        self.viewer.segment_picked_callback = self._on_segment_picked
 
     def _create_project_tree_dock(self) -> None:
         self.project_tree = ProjectTreeWidget(self)
@@ -162,27 +146,9 @@ class MainWindow(QMainWindow):
         top_view_action = view_menu.addAction("Top view (XY)")
         top_view_action.triggered.connect(self.viewer.set_top_view)
 
-    def _create_sim_toolbar(self) -> None:
-        """Simulation toolbar with Run / Pause / Stop."""
-        toolbar = QToolBar("Simulation", self)
-        toolbar.setObjectName("SimulationToolbar")
-        self.addToolBar(toolbar)
-
-        self.sim_run_action: QAction = toolbar.addAction("Run")
-        self.sim_pause_action: QAction = toolbar.addAction("Pause")
-        self.sim_stop_action: QAction = toolbar.addAction("Stop")
-
-        self.sim_run_action.triggered.connect(self._start_simulation)
-        self.sim_pause_action.triggered.connect(self._pause_simulation)
-        self.sim_stop_action.triggered.connect(self._stop_simulation)
-
-        self._update_sim_actions()
-
     # ----------------------------------------------------------------- actions
 
     def _new_project(self) -> None:
-        self._stop_simulation()  # reset sim if running
-
         self.project = Project(name="Untitled Project")
         self.current_job = None
         self.project_tree.set_project(self.project)
@@ -252,125 +218,9 @@ class MainWindow(QMainWindow):
         self.viewer.set_project(self.project)
         self.statusBar().showMessage("G-code updated from editor", 3000)
 
-    # -------------------------- simulation actions -----------------------------
-
-    def _update_sim_actions(self) -> None:
-        has_job = self.current_job is not None
-        self.sim_run_action.setEnabled(
-            has_job and self._sim_state in ("idle", "paused")
-        )
-        self.sim_pause_action.setEnabled(self._sim_state == "running")
-        self.sim_stop_action.setEnabled(self._sim_state in ("running", "paused"))
-
-    def _start_simulation(self) -> None:
-        """Start or resume offline simulation for the current job."""
-        if self.current_job is None:
-            QMessageBox.information(
-                self,
-                "No job selected",
-                "Select a job in the Project tree before running simulation.",
-            )
-            return
-
-        if self.current_job.program is None or not self.current_job.program.statements:
-            QMessageBox.information(
-                self,
-                "No G-code",
-                "The selected job has no parsed G-code to simulate.",
-            )
-            return
-
-        restarting = self._sim_state == "idle" or self._sim_job is not self.current_job
-        self._sim_job = self.current_job
-
-        if restarting:
-            self._sim_current_stmt_index = -1
-            self.viewer.reset_simulation_head()
-            # Snap to top view when starting a fresh run
-            self.viewer.set_top_view()
-
-        self._sim_state = "running"
-        self.sim_timer.start(self._sim_interval_ms)
-        self._update_sim_actions()
-        self.statusBar().showMessage("Simulation running…", 2000)
-
-    def _pause_simulation(self) -> None:
-        if self._sim_state != "running":
-            return
-        self.sim_timer.stop()
-        self._sim_state = "paused"
-        self._update_sim_actions()
-        self.statusBar().showMessage("Simulation paused", 2000)
-
-    def _stop_simulation(self) -> None:
-        if self._sim_state == "idle" and self._sim_job is None:
-            return
-        self.sim_timer.stop()
-        self._sim_state = "idle"
-        self._sim_job = None
-        self._sim_current_stmt_index = -1
-        self.viewer.reset_simulation_head()
-        self._update_sim_actions()
-        # Do not spam status bar if called as part of other actions
-
-    def _on_sim_tick(self) -> None:
-        """Timer callback: advance simulation through G-code."""
-        if self._sim_state != "running" or self._sim_job is None:
-            return
-
-        program = self._sim_job.program
-        if program is None or not program.statements:
-            self._stop_simulation()
-            return
-
-        total = len(program.statements)
-        if total == 0:
-            self._stop_simulation()
-            return
-
-        if self._sim_current_stmt_index < 0:
-            self._sim_current_stmt_index = 0
-        else:
-            lines_per_tick = max(
-                1, int(self._sim_lines_per_second * (self._sim_interval_ms / 1000.0))
-            )
-            self._sim_current_stmt_index += lines_per_tick
-
-        if self._sim_current_stmt_index >= total:
-            self._sim_current_stmt_index = total - 1
-
-        stmt_index = self._sim_current_stmt_index
-
-        # Update viewer head + highlight
-        self.viewer.update_simulation_head(self._sim_job, stmt_index)
-
-        # Focus editor on the corresponding line
-        stmt = program.statements[stmt_index]
-        line_no = getattr(stmt, "line_number", stmt_index + 1)
-
-        doc = self.gcode_editor.document()
-        block = doc.findBlockByNumber(line_no - 1)
-        if block.isValid():
-            cursor = QTextCursor(block)
-            cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
-            self.gcode_editor.setTextCursor(cursor)
-
-        self.statusBar().showMessage(
-            f"Simulation line {line_no} / {total}", self._sim_interval_ms * 2
-        )
-
-        # Stop automatically at the end
-        if stmt_index >= total - 1:
-            self._stop_simulation()
-            self.statusBar().showMessage("Simulation completed", 3000)
-
     # ----------------------------------------------------------------- callbacks
 
     def _on_job_selected(self, job: Optional[GCodeJob]) -> None:
-        # Changing job cancels any running simulation
-        if job is not self.current_job:
-            self._stop_simulation()
-
         self.current_job = job
 
         if job is None:
@@ -378,7 +228,6 @@ class MainWindow(QMainWindow):
             self.apply_action.setEnabled(False)
             self.apply_button.setEnabled(False)
             self.offset_button.setEnabled(False)
-            self._update_sim_actions()
             self.statusBar().showMessage("No job selected", 3000)
             return
 
@@ -386,7 +235,6 @@ class MainWindow(QMainWindow):
         self.apply_action.setEnabled(True)
         self.apply_button.setEnabled(True)
         self.offset_button.setEnabled(True)
-        self._update_sim_actions()
         self.statusBar().showMessage(f"Selected job: {job.name}", 3000)
 
     def _on_editor_cursor_changed(self) -> None:
@@ -427,58 +275,11 @@ class MainWindow(QMainWindow):
     def _on_visibility_changed(self) -> None:
         self.viewer.set_project(self.project)
 
-    # -------------------- viewer → mainwindow hooks -------------------
+    # -------------------- viewer �+' mainwindow hooks -------------------
 
     def _on_view_cursor_moved(self, x: float, y: float, z: float) -> None:
         """Update status bar with current crosshair position (always XY plane)."""
         self.status_coord_label.setText(f"X: {x:7.3f}    Y: {y:7.3f}    Z: {z:7.3f}")
-
-    def _on_segment_picked(self, job: GCodeJob, segment_index: int) -> None:
-        """Right-click in viewer selects nearest segment → editor line."""
-        # Select job in tree
-        root = getattr(self.project_tree, "jobs_root_item", None)
-        if root is not None:
-            for i in range(root.childCount()):
-                item = root.child(i)
-                if item.data(0, Qt.UserRole) == job.id:
-                    self.project_tree.setCurrentItem(item)
-                    break
-
-        self.current_job = job
-        self.gcode_editor.set_job(job)
-        self.apply_action.setEnabled(True)
-        self.apply_button.setEnabled(True)
-        self._update_sim_actions()
-
-        if job.program_index is None:
-            return
-
-        # Robust mapping: search through statement_to_segments
-        idx_map = job.program_index.statement_to_segments
-        stmt_index = None
-        for si, seg_list in idx_map.items():
-            if segment_index in seg_list:
-                stmt_index = si
-                break
-
-        if stmt_index is None:
-            return
-
-        stmt = job.program.statements[stmt_index]
-        line_no = stmt.line_number
-
-        doc = self.gcode_editor.document()
-        block = doc.findBlockByNumber(line_no - 1)
-        if not block.isValid():
-            return
-
-        cursor = QTextCursor(block)
-        cursor.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
-        self.gcode_editor.setTextCursor(cursor)
-        self.gcode_editor.setFocus()
-
-        # Keep highlight consistent with editor selection
-        self._on_editor_cursor_changed()
 
     # -------------------------- offsets dialog ------------------------
 
@@ -524,3 +325,4 @@ class MainWindow(QMainWindow):
         from core.lume_runtime import build_final_gcode
 
         return build_final_gcode(job)
+
