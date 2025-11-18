@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QToolButton,
+    QDialog,
 )
 from PySide6.QtGui import QTextCursor, QAction
 
@@ -24,6 +26,7 @@ from app.project_tree import ProjectTreeWidget
 from app.viewer import GCodeViewer
 from core.import_pipeline import import_gcode_file, reparse_job
 from core.project_model import GCodeJob, Project
+from app.xyz_offset_dialog import XYZOffsetDialog
 
 
 class MainWindow(QMainWindow):
@@ -100,6 +103,14 @@ class MainWindow(QMainWindow):
         self.apply_button.clicked.connect(self._apply_gcode_edits)
         self.apply_button.setEnabled(False)
         hlayout.addWidget(self.apply_button)
+
+        self.offset_button = QToolButton(editor_container)
+        self.offset_button.setText("Offsets")
+        self.offset_button.setToolTip("Edit workpiece offsets (G92)")
+        self.offset_button.clicked.connect(self._edit_offsets)
+        self.offset_button.setEnabled(False)
+        hlayout.addWidget(self.offset_button)
+
         hlayout.addStretch(1)
 
         self.gcode_editor = GCodeEditor(editor_container)
@@ -366,6 +377,7 @@ class MainWindow(QMainWindow):
             self.gcode_editor.clear()
             self.apply_action.setEnabled(False)
             self.apply_button.setEnabled(False)
+            self.offset_button.setEnabled(False)
             self._update_sim_actions()
             self.statusBar().showMessage("No job selected", 3000)
             return
@@ -373,6 +385,7 @@ class MainWindow(QMainWindow):
         self.gcode_editor.set_job(job)
         self.apply_action.setEnabled(True)
         self.apply_button.setEnabled(True)
+        self.offset_button.setEnabled(True)
         self._update_sim_actions()
         self.statusBar().showMessage(f"Selected job: {job.name}", 3000)
 
@@ -466,3 +479,48 @@ class MainWindow(QMainWindow):
 
         # Keep highlight consistent with editor selection
         self._on_editor_cursor_changed()
+
+    # -------------------------- offsets dialog ------------------------
+
+    def _edit_offsets(self) -> None:
+        if self.current_job is None:
+            return
+
+        job = self.current_job
+        dlg = XYZOffsetDialog(
+            offset_x=job.offset_x,
+            offset_y=job.offset_y,
+            offset_z=job.offset_z,
+            parent=self,
+        )
+        if dlg.exec() == QDialog.Accepted:
+            ox, oy, oz = dlg.get_offsets()
+            job.offset_x = ox
+            job.offset_y = oy
+            job.offset_z = oz
+
+            # Rebuild final Lume G-code with new offsets and make it canonical
+            from core.lume_runtime import build_final_gcode
+
+            new_source = build_final_gcode(job)
+            try:
+                # Update job model + geometry (database + plot)
+                reparse_job(job, new_source)
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(
+                    self,
+                    "Offset error",
+                    f"Could not apply offsets to G-code:\n{exc}",
+                )
+                return
+
+            # Refresh editor text so the new G92/header/footer are visible
+            if self.current_job is job:
+                self.gcode_editor.setPlainText(new_source)
+
+    # -------------------------- final G-code helper --------------------
+
+    def get_final_gcode_for_job(self, job: GCodeJob) -> str:
+        from core.lume_runtime import build_final_gcode
+
+        return build_final_gcode(job)

@@ -26,6 +26,9 @@ class GCodeJob:
 
     # Full text of the G-code file (as originally imported / last edited)
     original_source: str = ""
+    offset_x: float = 0.0
+    offset_y: float = 0.0
+    offset_z: float = -0.10
 
     # Parsed program + derived geometry
     program: Optional[GCodeProgram] = None

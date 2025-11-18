@@ -23,7 +23,12 @@ class GCodeEditor(QPlainTextEdit):
 
     def set_job(self, job: GCodeJob) -> None:
         self.current_job = job
-        self.setPlainText(job.original_source or "")
+        from core.lume_runtime import build_final_gcode
+
+        # Show the final Lume G-code (header + body + footer) so that
+        # replaced header/footer and offsets are visible to the user.
+        text = build_final_gcode(job)
+        self.setPlainText(text)
         cursor = self.textCursor()
         cursor.setPosition(0)
         self.setTextCursor(cursor)
