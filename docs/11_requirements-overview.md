@@ -1,5 +1,5 @@
 
-# CNC Software – Requirements Overview
+# CNC Software - Requirements Overview
 
 This document is the **entry point** for new developers (or AI agents) working on the CNC desktop application. It summarizes:
 
@@ -12,12 +12,12 @@ For detailed specs, see the per-feature documents in `docs/features/`.
 
 ---
 
-## 1. Product Purpose
+## Overview
 
-The application is a **G-code–first CNC controller and CAM helper** for a Cirqoid-style PCB milling machine. It combines:
+The application is a **G-code-first CNC controller and CAM helper** for a Cirqoid-style PCB milling machine. It combines:
 
-- **FlatCAM-style project management** with multiple G-code “jobs” per project.
-- **NC Viewer–style 2D/3D visualization and simulation** of toolpaths.
+- **FlatCAM-style project management** with multiple G-code "jobs" per project.
+- **NC Viewer-style 2D/3D visualization and simulation** of toolpaths.
 - A **line-by-line streaming engine** that talks to the controller over a serial port using its custom G-code dialect.
 - A set of **advanced operations** (height mapping, realignment, resume-from-click, etc.) implemented primarily as **G-code transforms**.
 
@@ -26,11 +26,11 @@ The app should make G-code visible, understandable, and safely executable.
 
 ---
 
-## 2. Machine & Environment Constraints
+## Machine & Environment Constraints
 
 The requirements are driven by the Cirqoid machine and its firmware.
 
-### 2.1 Axes and workspace
+### Axes and Workspace
 
 - Machine has three axes: **X, Y, Z** (directions as in the Cirqoid manual).
 - Typical travel limits (example values):
@@ -39,15 +39,15 @@ The requirements are driven by the Cirqoid machine and its firmware.
   - Z: `+2 .. -18 mm`  
     - Z = 0 is on the PCB copper surface.  
     - Negative Z cuts into the board.
-- **Software resolution** is ~1.25 µm and repeatability better than 0.02 mm.  
-  → The viewer, snapping and picking logic must support at least **0.01 mm** precision.
+- **Software resolution** is ~1.25 um and repeatability better than 0.02 mm.  
+  -> The viewer, snapping and picking logic must support at least **0.01 mm** precision.
 
-### 2.2 Supported G-code dialect
+### Supported G-code Dialect
 
 The controller supports a **restricted G-code subset**, documented in:
 
 - the Cirqoid machine manual, and
-- the internal “Supported G-code” spec.
+- the internal "Supported G-code" spec.
 
 Key groups:
 
@@ -56,7 +56,7 @@ Key groups:
 - Homing & coordinate systems: `G28`, `G53`, `G54`, `G92`
 - Spindle & auxiliaries: `M3`, `M5`, `M7`, `M8`, `M9`
 
-#### Accepted structure of a typical job
+#### Accepted Structure of a Typical Job
 
 Logically, each job looks like:
 
@@ -93,7 +93,7 @@ G00 Z5.0000         ; (example safe move)
 Notes:
 
 * **Header and footer** are managed by the application (Feature 15).
-  The imported G-code “body” should generally be **geometry only**.
+  The imported G-code "body" should generally be **geometry only**.
 * **Z offset** (`G92 ... Z####`) is **per job** and must be asked from the user
   before sending code to the CNC.
   Later this will be related to Z mesh / height map adjustments:
@@ -107,7 +107,7 @@ The application must:
 * **Ignore or clearly flag** unsupported codes.
 * Never generate commands outside valid machine ranges (axis limits, spindle PWM, etc.).
 
-### 2.3 Communication protocol
+### Communication Protocol
 
 Global rules for talking to the machine:
 
@@ -115,15 +115,15 @@ Global rules for talking to the machine:
 
 * **Strict line-by-line protocol**:
 
-  > send one G-code line → wait for `ok` / `nack` / `error` → then send next
+  > send one G-code line -> wait for `ok` / `nack` / `error` -> then send next
 
-* **Command rate limit** of roughly **5–8 lines/sec**, configurable.
+* **Command rate limit** of roughly **5-8 lines/sec**, configurable.
 
 * Both **short** and **long** operation timeouts must be supported.
 
 * **Retries** and clear error reporting belong to the streaming engine.
 
-### 2.4 Header & footer
+### Header & Footer
 
 Every job sent to the machine must be wrapped with a **standard preamble and footer**.
 
@@ -151,22 +151,22 @@ Header/footer injection is **centralized** (Feature 15) but must be respected by
 
 ---
 
-## 3. Major Feature Map & Dependencies
+## Feature Map & Dependencies
 
 The original FRD defines many features. This section summarizes the main ones, their dependencies, and their current approximate status.
 
 Legend:
 
-* **✅ Implemented** (basic version)
-* **🟡 Partially implemented / prototype**
-* **⬜ Not implemented yet**
+* **[ok] Implemented** (basic version)
+* **[yellow] Partially implemented / prototype**
+* **[ ] Not implemented yet**
 
-> Status must be kept in sync with `docs/01_current_implementation.md`.
+> Status must be kept in sync with `docs/10_current-implementation.md`.
 
-### 3.1 Core foundation
+### Core Foundation
 
-1. **Feature 1 – G-code Import & Parsing**
-   **Status:** 🟡
+1. **Feature 1 - G-code Import & Parsing**
+   **Status:** [yellow]
    Responsibilities:
 
    * Parse supported commands, maintain modal state, normalize coordinates, and build internal `GCodeProgram` structures.
@@ -185,11 +185,11 @@ Legend:
      * streaming engine,
      * advanced transforms (height mapping, alignment, etc.).
 
-2. **Feature 2 – 3D G-code Plotting / Viewer & Editor**
-   **Status:** 🟡 (basic version working; several improvements pending)
+2. **Feature 2 - 3D G-code Plotting / Viewer & Editor**
+   **Status:** [yellow] (basic version working; several improvements pending)
    Responsibilities:
 
-   * NC Viewer–style 3D/2D plotting with:
+   * NC Viewer-style 3D/2D plotting with:
 
      * isometric 3D view,
      * top-down 2D view,
@@ -200,7 +200,7 @@ Legend:
      * project tree on the left,
      * central viewer,
      * G-code editor at bottom.
-   * Synchronized editor ↔ viewer interactions:
+   * Synchronized editor <-> viewer interactions:
 
      * selecting lines in the editor highlights corresponding segments,
      * clicking in the viewer can select a line in the editor.
@@ -221,28 +221,28 @@ Legend:
    * Continuous cursor coordinates in the UI should always reflect the XY
      position of the crosshair in the plot area (even when moving).
 
-3. **Feature 4 – Reliable Line-By-Line Streaming Engine**
-   **Status:** ⬜ (design only)
+3. **Feature 4 - Reliable Line-By-Line Streaming Engine**
+   **Status:** [ ] (design only)
    Responsibilities:
 
-   * Implement the strict send → wait → ack protocol.
+   * Implement the strict send -> wait -> ack protocol.
    * Obey rate limits and timeouts.
    * Provide clear error handling and status reporting.
    * Expose events for:
 
-     * live simulation (“line X confirmed executed”),
+     * live simulation ("line X confirmed executed"),
      * pause/resume,
      * emergency stop.
 
 These three are the **foundation**: parsing, visualization, and robust streaming.
 
-### 3.2 Execution & control
+### Execution & Control
 
-4. **Feature 3 – Live G-code Simulation (Synced With CNC)**
-   **Status:** 🟡 (offline simulation logic exists; live sync with CNC not done)
+4. **Feature 3 - Live G-code Simulation (Synced With CNC)**
+   **Status:** [yellow] (offline simulation logic exists; live sync with CNC not done)
    Responsibilities:
 
-   * Drive a visual “tool head” along the path based on:
+   * Drive a visual "tool head" along the path based on:
 
      * internal stepping (offline mode), or
      * real `ok` responses from the controller (online mode).
@@ -253,16 +253,16 @@ These three are the **foundation**: parsing, visualization, and robust streaming
      * current active segment.
    * Disable hover/select while simulation is running.
 
-5. **Feature 5 – Pause & Continue**
-   **Status:** ⬜
+5. **Feature 5 - Pause & Continue**
+   **Status:** [ ]
    Responsibilities:
 
    * Safely pause streaming in the middle of a job.
    * Preserve controller modal state.
    * Resume without leaving marks or gouges.
 
-6. **Feature 6 – On-The-Fly & Global Z Adjustment**
-   **Status:** ⬜
+6. **Feature 6 - On-The-Fly & Global Z Adjustment**
+   **Status:** [ ]
    Responsibilities:
 
    * Apply global or incremental Z offset to **remaining** motions:
@@ -271,8 +271,8 @@ These three are the **foundation**: parsing, visualization, and robust streaming
      * using either `G92` updates or Z-modified motion commands.
    * Integrate cleanly with height map / Z mesh logic.
 
-7. **Feature 7 – Resume From Click / Restart Anywhere**
-   **Status:** ⬜
+7. **Feature 7 - Resume From Click / Restart Anywhere**
+   **Status:** [ ]
    Responsibilities:
 
    * Let the user click on a location in the viewer, then:
@@ -281,17 +281,17 @@ These three are the **foundation**: parsing, visualization, and robust streaming
      * compute a safe resume preamble (moves, spindle, Z, etc.),
      * stream from that point as a new job.
 
-8. **Feature 8 – Single Line / Range Execution**
-   **Status:** ⬜
+8. **Feature 8 - Single Line / Range Execution**
+   **Status:** [ ]
    Responsibilities:
 
    * Allow execution of a single line or a selected range from the editor.
    * Use the same streaming engine; ensure all safety checks still apply.
 
-### 3.3 Geometric transforms & calibration
+### Geometric Transforms & Calibration
 
-9. **Feature 9 – Height Mapping / Auto-Leveling**
-   **Status:** ⬜
+9. **Feature 9 - Height Mapping / Auto-Leveling**
+   **Status:** [ ]
    Responsibilities:
 
    * Probe or import a Z mesh over the board area.
@@ -299,40 +299,40 @@ These three are the **foundation**: parsing, visualization, and robust streaming
    * Combine with base Z offset (Feature 1) and on-the-fly adjustments
      (Feature 6).
 
-10. **Feature 10 – 3-Point Realignment / Affine Correction**
-    **Status:** ⬜
+10. **Feature 10 - 3-Point Realignment / Affine Correction**
+    **Status:** [ ]
     Responsibilities:
 
     * Use three (or more) corresponding fiducials (machine vs design) to
       compute a 2D affine transform (scale, rotation, translation, skew).
     * Apply this transform to all future toolpaths for a given job.
 
-11. **Feature 11 – Reference Point Drilling**
-    **Status:** ⬜
+11. **Feature 11 - Reference Point Drilling**
+    **Status:** [ ]
     Responsibilities:
 
     * Generate drilling jobs for reference / alignment holes.
     * Used by Feature 10 and double-sided PCB workflows.
 
-### 3.4 Optimization & housekeeping
+### Optimization & Housekeeping
 
-12. **Feature 19 – Project Save/Load (FlatCAM-like)**
-    **Status:** ⬜
+12. **Feature 19 - Project Save/Load (FlatCAM-like)**
+    **Status:** [ ]
     Responsibilities:
 
     * Save project tree, file paths or embedded G-code, height maps,
       transforms, and resume points.
     * Reload projects reliably and restore viewer state.
 
-13. **Feature 22 – Command Rate Limiting**
-    **Status:** ⬜
+13. **Feature 22 - Command Rate Limiting**
+    **Status:** [ ]
     Responsibilities:
 
     * Central control for maximum lines/sec streaming rate.
     * Integrate with streaming engine timing and progress display.
 
-14. **Feature 23 – Serial Logging & Diagnostics**
-    **Status:** ⬜
+14. **Feature 23 - Serial Logging & Diagnostics**
+    **Status:** [ ]
     Responsibilities:
 
     * Log all serial traffic (commands and responses).
@@ -343,11 +343,11 @@ These three are the **foundation**: parsing, visualization, and robust streaming
 
 ---
 
-## 4. Intended Architecture (High Level)
+## Intended Architecture
 
 This section helps future developers map features to file structure quickly.
 
-### 4.1 Core layers
+### Core Layers
 
 1. **G-code model & parser (core)**
    Files: `gcode_parser.py`, `gcode_model.py`, `supported_codes.py`
@@ -377,7 +377,7 @@ This section helps future developers map features to file structure quickly.
 
    * Manage the project tree of **G-code jobs** (imported, edited, transformed).
    * Support multiple files per project.
-   * Run `file → parse → build geometry` with robust error reporting.
+   * Run `file -> parse -> build geometry` with robust error reporting.
 
 4. **UI shell & tools**
    Files: `main_window.py`, `project_tree.py`, `gcode_editor.py`
@@ -393,13 +393,13 @@ This section helps future developers map features to file structure quickly.
 
    Responsibilities:
 
-   * Implement Features 3–8, 15, 21–23 (actual CNC control).
+   * Implement Features 3-8, 15, 21-23 (actual CNC control).
    * Provide events & state updates to:
 
      * the viewer (for live simulation),
      * the UI (for progress, errors, E-stop).
 
-### 4.2 Unified movement list
+### Unified Movement List
 
 Architectural direction (NC Viewer-style):
 
@@ -419,27 +419,27 @@ Each movement should store:
 
 ---
 
-## 5. External Inspirations & UX Targets
+## External Inspirations & UX Targets
 
-### 5.1 NC Viewer
+### NC Viewer
 
 We intentionally copy several behaviours from **NC Viewer**:
 
 * **3D isometric view** with grid floor and colour-coded toolpaths.
 * **Isometric zoom-to-fit** based on the toolpath bounding box.
-* **Segment picking → G-code line mapping**:
+* **Segment picking -> G-code line mapping**:
 
   * click in viewer selects the corresponding line,
   * selecting a line highlights its segments.
 * **Simulation colouring**:
 
   * Unvisited segments: base feed/rapid colours.
-  * Visited segments: “completed” colour.
-  * Current active segment: highlighted “active” colour.
+  * Visited segments: "completed" colour.
+  * Current active segment: highlighted "active" colour.
 
 Developers should consult `NCviewer.html` for implementation ideas, but **port concepts, not JavaScript code**.
 
-### 5.2 FlatCAM
+### FlatCAM
 
 From **FlatCAM**, we borrow:
 
@@ -447,7 +447,7 @@ From **FlatCAM**, we borrow:
 * Continuous **mouse coordinate readout** in status bar.
 * 2D zooming & panning behaviour, including a grid that becomes finer as you zoom in.
 
-### 5.3 Candle
+### Candle
 
 Another important inspiration is **Candle** (popular GRBL G-code sender):
 
@@ -458,12 +458,12 @@ We want to learn and copy techniques from Candle for features that match our req
 * Jog control and manual movement UI.
 * The feel of its real-time view + machine control integration.
 
-When a feature overlaps with Candle’s functionality, developers should:
+When a feature overlaps with Candle's functionality, developers should:
 
 * Study how Candle solves it,
-* Adapt the approach to this project’s architecture and G-code dialect.
+* Adapt the approach to this project's architecture and G-code dialect.
 
-### 5.4 Cirqoid manual
+### Cirqoid Manual
 
 The **Cirqoid machine manual** is the authoritative reference for:
 
@@ -475,7 +475,7 @@ Any behaviour that sends commands **must** be checked against these constraints.
 
 ---
 
-## 6. Roadmap Summary for Future Work
+## Future Improvements
 
 This is a **recommended development order**, assuming basic Feature 1 and Feature 2 support already exists.
 
@@ -484,7 +484,7 @@ This is a **recommended development order**, assuming basic Feature 1 and Featur
    * Harden the parser & viewer pipeline on real sample files.
    * Finish picking, point highlighting, cursor coordinate readout, and editor synchronization.
 
-2. **Introduce unified movement list & NC Viewer–style rendering**
+2. **Introduce unified movement list & NC Viewer-style rendering**
 
    * Build a movement list per job.
    * Refactor viewer to rely on a single batched geometry per job with per-vertex colour buffers.
@@ -500,12 +500,12 @@ This is a **recommended development order**, assuming basic Feature 1 and Featur
    * Link streaming events with viewer head position and visited path colours.
    * Ensure hover/select is disabled during playback.
 
-5. **Pause/continue and safe resume (Features 5–7, 8)**
+5. **Pause/continue and safe resume (Features 5-7, 8)**
 
    * Implement Z offset adjustments, resume-from-click, and range execution.
    * Reuse the movement list and program indices for safety checks.
 
-6. **Calibration transforms & CAM helpers (Features 9–12)**
+6. **Calibration transforms & CAM helpers (Features 9-12)**
 
    * Implement height map, affine alignment, mirroring, and reference drilling.
    * Reuse movement list + transforms instead of regenerating G-code from scratch.
@@ -514,7 +514,7 @@ Each of these steps should update:
 
 * the relevant feature doc in `docs/features/`,
 * this overview file, and
-* `docs/01_current_implementation.md`,
+* `docs/10_current-implementation.md`,
 
 so that docs and code stay synchronized.
 

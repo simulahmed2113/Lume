@@ -1,8 +1,6 @@
+# Feature 01: Import & Parsing
 
-````markdown
-# Feature 1 – G-code Import & Parsing
-
-## 1. Summary
+## Overview
 
 Feature 1 is responsible for getting G-code **into** the application and turning
 it into a structured, machine-aware model that everything else can use:
@@ -26,9 +24,9 @@ serial-communication logic.
 
 ---
 
-## 2. Goals & User Stories
+## Goals
 
-### 2.1 Goals
+### Product Goals
 
 - Make it easy and safe to load G-code from FlatCAM or other CAM tools.
 - Give users a clear view of:
@@ -39,7 +37,7 @@ serial-communication logic.
   - can be transformed (Z mesh, affine, mirror),
   - can be streamed line-by-line safely.
 
-### 2.2 User stories
+### User Stories
 
 1. **Load PCB milling job**
 
@@ -65,16 +63,16 @@ serial-communication logic.
 
 ---
 
-## 3. Scope
+## Scope
 
-### 3.1 In scope
+### In Scope
 
 - Import of G-code files with extension `.nc`.
-- Parsing of supported G-code dialect (subset defined by Cirqoid + “Supported G-code” doc).
+- Parsing of supported G-code dialect (subset defined by Cirqoid + "Supported G-code" doc).
 - Storage of:
   - raw source text,
   - parsed program (`GCodeProgram`),
-  - line → statement index mapping.
+  - line -> statement index mapping.
 - Detection and reporting of:
   - syntax errors,
   - unsupported commands,
@@ -85,19 +83,19 @@ serial-communication logic.
   - viewer,
   - streaming engine and transforms.
 
-### 3.2 Out of scope
+### Out of Scope
 
-- Header/footer generation itself (Feature 15 – implemented elsewhere).
+- Header/footer generation itself (Feature 15 - implemented elsewhere).
 - Serial communication or streaming (Feature 4+).
 - UI layout (handled by main window / project tree / editor).
 
 ---
 
-## 4. Dependencies
+## Dependencies
 
 - **Machine dialect & safety**
   - Cirqoid manual (axes, limits, supported codes).
-  - Internal “Supported G-code” table.
+  - Internal "Supported G-code" table.
 
 - **Core modules**
   - `gcode_parser.py`
@@ -114,12 +112,12 @@ serial-communication logic.
 
 ---
 
-## 5. Functional Requirements
+## Functional Requirements
 
-### 5.1 File import
+### File Import
 
 1. The app must be able to open `.nc` files from:
-   - menu: **File → Open G-code file…**
+   - menu: **File -> Open G-code file...**
    - drag-and-drop (future enhancement, optional).
 
 2. Multiple files can be selected in one go; each becomes a separate **G-code job** under the current project.
@@ -132,7 +130,7 @@ serial-communication logic.
 
 ---
 
-### 5.2 G-code structure handling (header / body / footer)
+### G-code Structure Handling (Header / Body / Footer)
 
 The application expects that **CAM-generated files primarily contain the
 geometric body**, but must also handle users importing complete programs that
@@ -144,20 +142,20 @@ already include preambles and footers.
      **geometric body region**:
      - motion commands (`G0/G1/G2/G3`) with X/Y(/Z) coordinates,
      - relevant feed changes (`F`),
-     - spindle state if it affects movement (e.g. “engraving vs rapid”).
+     - spindle state if it affects movement (e.g. "engraving vs rapid").
 
 2. **Header/footer awareness**
 
    - If header/footer-like commands exist in the file (e.g. `G28`, `G53`, `M3`,
      `M5`), they must still be parsed, but:
-     - flagged to the user (e.g. “CAM generated its own header/footer”),
+     - flagged to the user (e.g. "CAM generated its own header/footer"),
      - clearly marked in the internal model so the **centralized header/footer
        engine** can decide whether to keep or override them.
 
 3. **Execution program construction (later features)**
 
    - Feature 1 provides enough structure so other features can build a final
-     “execution program” as:
+     "execution program" as:
 
      ```text
      HEADER (from Feature 15, using job config)
@@ -170,7 +168,7 @@ already include preambles and footers.
 
 ---
 
-### 5.3 Parsing rules
+### Parsing Rules
 
 The parser must:
 
@@ -203,7 +201,7 @@ The parser must:
    - Only codes from the supported list are considered **valid**.
    - Others should:
      - be preserved in the raw source,
-     - be stored as “unknown” statements,
+     - be stored as "unknown" statements,
      - generate **warnings** (not fatal errors) unless explicitly dangerous.
 
 5. **Error handling**
@@ -219,7 +217,7 @@ The parser must:
 
 ---
 
-### 5.4 Z offset configuration
+### Z Offset Configuration
 
 This is a key part of the workflow and must be clear.
 
@@ -251,7 +249,7 @@ board surface.
 
 ---
 
-### 5.5 Program index & geometry hooks
+### Program Index & Geometry Hooks
 
 The parser must output enough information for the geometry builder and viewer.
 
@@ -264,8 +262,8 @@ The parser must output enough information for the geometry builder and viewer.
 
    * A separate `ProgramIndex` structure (built together with geometry) maps:
 
-     * from statement → list of segment indices,
-     * from segment → statement index.
+     * from statement -> list of segment indices,
+     * from segment -> statement index.
 
 2. **Movement representation**
 
@@ -280,17 +278,17 @@ The parser must output enough information for the geometry builder and viewer.
 
    * There must be a stable mapping from:
 
-     * editor line → statement index → segment indices,
-     * viewer picked segment → statement index → editor line.
+     * editor line -> statement index -> segment indices,
+     * viewer picked segment -> statement index -> editor line.
 
    * This mapping is critical for Feature 2 (viewer/editor sync), Feature 3
      (simulation), and Feature 7 (resume from click).
 
 ---
 
-## 6. Data Model
+## Data Model
 
-### 6.1 GCodeJob (project model)
+### GCodeJob (Project Model)
 
 At minimum, each `GCodeJob` should contain:
 
@@ -303,9 +301,9 @@ At minimum, each `GCodeJob` should contain:
 * `geometry`: toolpath geometry (segments) derived from `program`.
 * `z_surface_offset`: user-specified Z offset (float).
 * `visible`: whether job is shown in viewer.
-* `color`: base colour for this job’s geometry.
+* `color`: base colour for this job's geometry.
 
-### 6.2 GCodeProgram
+### GCodeProgram
 
 Core elements (conceptual):
 
@@ -314,17 +312,17 @@ Core elements (conceptual):
 
   * `line_number`
   * `modal_group` (motion / plane / units / etc.)
-  * parsed words (X/Y/Z/F/S/G/M/…)
+  * parsed words (X/Y/Z/F/S/G/M/...)
   * error/warning flags
   * flags `is_header_candidate`, `is_footer_candidate`, `is_body_motion`, etc.
 
 ---
 
-## 7. Non-Functional Requirements
+## Non-Functional Requirements
 
 1. **Performance**
 
-   * Typical use case: PCB toolpaths in the range of 1–100k lines.
+   * Typical use case: PCB toolpaths in the range of 1-100k lines.
    * Parsing and geometry building for a 10k-line file should complete well
      under 1 second on a modern desktop.
 
@@ -349,7 +347,7 @@ Core elements (conceptual):
 
 ---
 
-## 8. Implementation Notes for Developers / AI Agents
+## Implementation Notes for Developers / AI Agents
 
 1. **Do not rewrite the parser from scratch** unless absolutely necessary.
    Prefer incremental improvements that keep the existing data model stable.
@@ -370,7 +368,7 @@ Core elements (conceptual):
 5. **Always think about the mapping chain**:
 
    ```text
-   file line ↔ statement ↔ movement(s) ↔ geometry segment(s)
+   file line <-> statement <-> movement(s) <-> geometry segment(s)
    ```
 
    Any changes to parsing must preserve or improve this mapping, not break it.
@@ -383,4 +381,21 @@ Core elements (conceptual):
    * Cirqoid manual for what the machine actually accepts.
 
 ---
+
+## Edge Cases / Limitations
+
+- Header and footer construction does not live here. The import stage must keep
+  the raw body intact so Feature 15 can safely inject the standardized wraps.
+- Files larger than the 1-100k line target may need additional optimisation in
+  the parser and geometry builder.
+- If the user skips the Z offset prompt, streaming cannot finish the job safely
+  because every downstream correction (Features 5, 6, 9) assumes that base
+  offset exists.
+
+## Future Improvements
+
+1. Expand the supported G- and M-code list and keep it in sync with the Cirqoid
+   reference so validation errors stay precise.
+2. Add incremental parsing hooks (e.g. streaming large files) so reimporting or
+   editing massive jobs does not block the UI thread.
 
