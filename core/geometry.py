@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 
 
 class SegmentType(Enum):
-    """Type of toolpath segment, used for colouring / future filtering."""
+    """Type of toolpath segment used by the unified movement model."""
 
     RAPID = auto()
     LINEAR = auto()
@@ -18,22 +18,30 @@ Point3D = Tuple[float, float, float]
 
 
 @dataclass
-class PathSegment:
-    """Single toolpath segment between two 3D points."""
+class Movement:
+    """
+    Single logical tool movement in 3D space.
+
+    This is the unified representation used for picking, simulation,
+    and future transforms. Arcs are represented as one or more
+    movements referencing the original statement_index.
+    """
 
     index: int
-    job_id: str
     statement_index: int  # index into GCodeProgram.statements
     start: Point3D
     end: Point3D
-    segment_type: SegmentType = SegmentType.LINEAR
+    segment_type: SegmentType
 
 
 @dataclass
-class GeometryData:
-    """All segments for a given GCodeProgram / job."""
+class PathSegment:
+    """Low-level line segment between two 3D points."""
 
-    segments: List[PathSegment] = field(default_factory=list)
+    index: int
+    start: Point3D
+    end: Point3D
+    segment_type: SegmentType
 
 
 @dataclass

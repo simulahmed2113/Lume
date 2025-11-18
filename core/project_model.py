@@ -6,7 +6,8 @@ from typing import List, Optional, Tuple
 import uuid
 
 from core.gcode_parser import GCodeProgram
-from core.geometry_builder import ToolpathGeometry, ProgramIndex
+from core.geometry_builder import ToolpathGeometry
+from core.geometry import ProgramIndex, Movement, Point3D
 
 
 Color = Tuple[float, float, float, float]
@@ -34,6 +35,10 @@ class GCodeJob:
     program: Optional[GCodeProgram] = None
     geometry: Optional[ToolpathGeometry] = None
     program_index: Optional[ProgramIndex] = None
+
+    # Unified movement model (v0.2)
+    movements: List[Movement] = field(default_factory=list)
+    vertices: List[Point3D] = field(default_factory=list)
 
     # UI / project metadata
     id: str = field(default_factory=lambda: str(uuid.uuid4()))

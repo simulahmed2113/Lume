@@ -20,6 +20,7 @@ from typing import Dict, List, Tuple
 import math
 
 from core.gcode_parser import GCodeProgram, GCodeStatement
+from core.geometry import ProgramIndex
 
 
 Point3D = Tuple[float, float, float]
@@ -34,14 +35,6 @@ class ToolpathSegment:
 @dataclass
 class ToolpathGeometry:
     segments: List[ToolpathSegment]
-
-
-@dataclass
-class ProgramIndex:
-    # map statement index -> list of segment indices
-    statement_to_segments: Dict[int, List[int]]
-    # reverse map: segment index -> owning statement index
-    segment_to_statement: Dict[int, int]
 
 
 # ---------------------------------------------------------------------------
