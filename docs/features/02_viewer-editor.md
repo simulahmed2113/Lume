@@ -24,6 +24,9 @@ with whatever is shown in the viewer.
 - Keep the XY grid responsive to zoom level and show clear axis indicators
   (X = red, Y = green, Z = blue).
 - Display a continuous XY coordinate readout for the mouse cursor.
+- Provide a camera toolbar with:
+  - Zoom-to-fit based on the visible toolpath bounding box.
+  - A toggle that flips between top-down XY and isometric 3D presets.
 
 ### UI Integration
 

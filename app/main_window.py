@@ -5,6 +5,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
     QDockWidget,
     QFileDialog,
     QHBoxLayout,
@@ -13,10 +14,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStatusBar,
+    QToolBar,
     QVBoxLayout,
     QWidget,
     QToolButton,
-    QDialog,
 )
 from PySide6.QtGui import QTextCursor
 
@@ -44,12 +45,14 @@ class MainWindow(QMainWindow):
 
         self.project = Project(name="Untitled Project")
         self.current_job: Optional[GCodeJob] = None
+        self._is_top_view: bool = False
 
         self._create_viewer()
         self._create_project_tree_dock()
         self._create_gcode_editor_dock()
         self._create_status_bar()
         self._create_menu_bar()
+        self._create_view_toolbar()
 
     # ----------------------------------------------------------------- UI setup
 
@@ -145,6 +148,20 @@ class MainWindow(QMainWindow):
         view_menu = menu_bar.addMenu("&View")
         top_view_action = view_menu.addAction("Top view (XY)")
         top_view_action.triggered.connect(self.viewer.set_top_view)
+
+    def _create_view_toolbar(self) -> None:
+        toolbar = QToolBar("View", self)
+        toolbar.setObjectName("ViewToolbar")
+
+        fit_action = toolbar.addAction("Fit")
+        fit_action.setToolTip("Zoom to fit all visible geometry")
+        fit_action.triggered.connect(self.viewer.zoom_to_fit)
+
+        toggle_action = toolbar.addAction("Toggle")
+        toggle_action.setToolTip("Toggle between isometric and top views")
+        toggle_action.triggered.connect(self._toggle_view_mode)
+
+        self.addToolBar(toolbar)
 
     # ----------------------------------------------------------------- actions
 
@@ -283,6 +300,15 @@ class MainWindow(QMainWindow):
 
     # -------------------------- offsets dialog ------------------------
 
+    def _toggle_view_mode(self) -> None:
+        """Toggle between isometric and top-down camera views."""
+        if self._is_top_view:
+            self.viewer.set_iso_view()
+            self._is_top_view = False
+        else:
+            self.viewer.set_top_view()
+            self._is_top_view = True
+
     def _edit_offsets(self) -> None:
         if self.current_job is None:
             return
@@ -325,4 +351,3 @@ class MainWindow(QMainWindow):
         from core.lume_runtime import build_final_gcode
 
         return build_final_gcode(job)
-

@@ -4,6 +4,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple
 
 import math
 import numpy as np
+import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.opengl import GLGraphicsItem, GLScatterPlotItem
 from PySide6.QtCore import Qt, QEvent
@@ -48,7 +49,6 @@ class GCodeViewer(QWidget):
         # Background and camera
         self.view.setBackgroundColor(30, 30, 30)
         self.view.opts["distance"] = 200
-        self.view.orbit(45, 45)
         self.view.setCursor(Qt.CrossCursor)
 
         # Tiny coloured axis legend overlay inside the view
@@ -94,6 +94,8 @@ class GCodeViewer(QWidget):
 
         # Initial grid spacing tuning
         self._update_grid_spacing()
+        # Default to an isometric-like view from (-, -, +) quadrant
+        self.set_iso_view()
 
     # ----------------------------------------------------------------- public API
 
@@ -104,7 +106,67 @@ class GCodeViewer(QWidget):
 
     def set_top_view(self) -> None:
         """Convenience: look straight down on XY plane."""
-        self.view.setCameraPosition(elevation=90, azimuth=0)
+        # Elevation 90 => top-down; azimuth 0 aligns X to the right
+        # and Y upwards in the 2D projection (screen space).
+        self.view.setCameraPosition(elevation=90, azimuth=270)
+        self._update_grid_spacing()
+
+    def set_iso_view(self) -> None:
+        """Set camera to an isometric view from (-, -, +) quadrant."""
+        # Azimuth ~225deg looks from negative X/negative Y towards origin.
+        self.view.setCameraPosition(elevation=35, azimuth=225)
+        self._update_grid_spacing()
+
+    def zoom_to_fit(self) -> None:
+        """Zoom camera so all visible geometry fits the view."""
+        if self._project is None:
+            return
+
+        has_geometry = False
+        min_x = min_y = min_z = float("inf")
+        max_x = max_y = max_z = float("-inf")
+
+        for job in self._project.jobs:
+            if not job.visible or job.geometry is None:
+                continue
+            segments = job.geometry.segments
+            if not segments:
+                continue
+            has_geometry = True
+            for seg in segments:
+                for (x, y, z) in (seg.start, seg.end):
+                    if x < min_x:
+                        min_x = x
+                    if y < min_y:
+                        min_y = y
+                    if z < min_z:
+                        min_z = z
+                    if x > max_x:
+                        max_x = x
+                    if y > max_y:
+                        max_y = y
+                    if z > max_z:
+                        max_z = z
+
+        if not has_geometry:
+            return
+
+        cx = (min_x + max_x) * 0.5
+        cy = (min_y + max_y) * 0.5
+        cz = (min_z + max_z) * 0.5
+        self.view.opts["center"] = pg.Vector(cx, cy, cz)
+
+        span_x = max_x - min_x
+        span_y = max_y - min_y
+        span_z = max_z - min_z
+        radius = max(span_x, span_y, span_z) * 0.5
+        if radius <= 0:
+            radius = 10.0
+
+        # Factor chosen empirically to keep geometry comfortably in view.
+        distance = max(radius * 3.0, 50.0)
+        self.view.setCameraPosition(distance=distance)
+        self._update_grid_spacing()
 
     def highlight_segments(self, job: GCodeJob, segment_indices: Sequence[int]) -> None:
         """Highlight specific segments for a job."""
@@ -363,4 +425,3 @@ class GCodeViewer(QWidget):
         y = ny + (fy - ny) * t
         z = nz + (fz - nz) * t
         return float(x), float(y), float(z)
-

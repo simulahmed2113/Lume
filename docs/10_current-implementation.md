@@ -268,6 +268,12 @@ Responsibilities:
   * Shows current mouse / cursor coordinates (X, Y, optionally Z).
   * May also show simple messages (simulation state, etc.).
 
+* **View toolbar**:
+
+  * Top-level toolbar with camera controls:
+    * `Fit` - zoom-to-fit of all visible toolpaths based on their bounding box.
+    * `Toggle` - switches between isometric 3D view and strict top-down XY view.
+
 ---
 
 ### Viewer Behaviour (3D & 2D)
@@ -277,8 +283,8 @@ Responsibilities:
 * Camera:
 
   * Default elevation ~ 30-35 degrees.
-  * Azimuth ~ 45 degrees.
-  * Distance based on scene size (may still be tuned).
+  * Azimuth ~ 225 degrees (looking from negative X / negative Y towards the origin).
+  * Distance based on scene size (via zoom-to-fit or manual zoom).
 * Visuals:
 
   * Gray XY grid at Z=0.
